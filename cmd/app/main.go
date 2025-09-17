@@ -1,24 +1,53 @@
 package main
 
 import (
-	"errors"
-	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/j3dyy/nazuki/internal/app"
 	cfg "github.com/j3dyy/nazuki/internal/config"
-	"github.com/j3dyy/nazuki/internal/service"
-	"github.com/j3dyy/nazuki/internal/store"
+	"github.com/rs/zerolog/log"
 )
 
-var app cfg.Application
-
 func main() {
-
 	defaultCfg := cfg.LoadConfigFromEnv()
+	app, err := app.NewApplication(defaultCfg)
+	if err != nil {
+		log.Info().Msg(err.Error())
+		os.Exit(1)
+	}
 
-	app = cfg.NewApplication(service.Service{}, store.Store{})
-	app.Logger.Err(errors.New("error occured"))
+	go listenForError(app)
+	go listenForShutdown(app)
 
-	fmt.Printf("Default Config: %+v\n", app)
-	fmt.Printf("Default Config: %+v\n", defaultCfg)
+}
 
+func listenForError(app *app.Application) {
+	for {
+		select {
+		case err := <-app.ErrorChan:
+			app.Logger.Error().Err(err).Msg(err.Error())
+		case <-app.ErrorChanDone:
+			return
+		}
+	}
+}
+
+func listenForShutdown(app *app.Application) {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	shutdown(app)
+	os.Exit(0)
+}
+
+func shutdown(app *app.Application) {
+	app.Logger.Info().Msg("Shutting down server...")
+
+	app.Wait.Wait()
+	app.ErrorChanDone <- true
+
+	close(app.ErrorChan)
+	close(app.ErrorChanDone)
 }

@@ -1,10 +1,12 @@
 package service
 
-import "database/sql"
+import (
+	"github.com/j3dyy/nazuki/internal/store"
+)
 
 type Service struct {
 }
 
-func NewService(db *sql.DB) Service {
+func NewService(store *store.Store) Service {
 	return Service{}
 }

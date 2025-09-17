@@ -1,24 +1,18 @@
 package cfg
 
 import (
-	"os"
 	"time"
 
 	"github.com/j3dyy/nazuki/internal/env"
-	"github.com/j3dyy/nazuki/internal/service"
-	"github.com/j3dyy/nazuki/internal/store"
-	"github.com/nats-io/nats.go"
-	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
 )
 
-type Option func(*config)
+type Option func(*Config)
 
 type dbConfig struct {
-	dsn          string
-	maxOpenConns int
-	maxIdleConns int
-	maxIdleTime  time.Duration
+	DSN          string
+	MaxOpenConns int
+	MaxIdleConns int
+	MaxIdleTime  time.Duration
 }
 
 type redisConfig struct {
@@ -30,33 +24,33 @@ type natsConfig struct {
 	url string
 }
 
-type config struct {
+type Config struct {
 	addr        string
-	dbConfig    dbConfig
-	redisConfig redisConfig
-	natsConfig  natsConfig
+	DBConfig    dbConfig
+	RedisConfig redisConfig
+	NatsConfig  natsConfig
 }
 
 func WithAddr(addr string) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.addr = addr
 	}
 }
 
 func WithDBConfig(dsn string, maxOpenConns, maxIdleConns int, maxIdleTime time.Duration) Option {
-	return func(c *config) {
-		c.dbConfig = dbConfig{
-			dsn:          dsn,
-			maxOpenConns: maxOpenConns,
-			maxIdleConns: maxIdleConns,
-			maxIdleTime:  maxIdleTime,
+	return func(c *Config) {
+		c.DBConfig = dbConfig{
+			DSN:          dsn,
+			MaxOpenConns: maxOpenConns,
+			MaxIdleConns: maxIdleConns,
+			MaxIdleTime:  maxIdleTime,
 		}
 	}
 }
 
 func WithRedisConfig(addr, password string) Option {
-	return func(c *config) {
-		c.redisConfig = redisConfig{
+	return func(c *Config) {
+		c.RedisConfig = redisConfig{
 			addr:     addr,
 			password: password,
 		}
@@ -64,19 +58,19 @@ func WithRedisConfig(addr, password string) Option {
 }
 
 func WithNatsConfig(url string) Option {
-	return func(c *config) {
-		c.natsConfig = natsConfig{
+	return func(c *Config) {
+		c.NatsConfig = natsConfig{
 			url: url,
 		}
 	}
 }
 
-func NewConfig(opts ...Option) *config {
-	c := &config{
+func NewConfig(opts ...Option) *Config {
+	c := &Config{
 		addr:        "localhost:8080",
-		dbConfig:    dbConfig{},
-		redisConfig: redisConfig{},
-		natsConfig:  natsConfig{},
+		DBConfig:    dbConfig{},
+		RedisConfig: redisConfig{},
+		NatsConfig:  natsConfig{},
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -84,7 +78,7 @@ func NewConfig(opts ...Option) *config {
 	return c
 }
 
-func LoadConfigFromEnv() *config {
+func LoadConfigFromEnv() *Config {
 	defaultCfg := NewConfig(
 		WithAddr(env.GetString("APP_ADDR", ":8080")),
 		WithDBConfig(
@@ -100,31 +94,4 @@ func LoadConfigFromEnv() *config {
 		WithNatsConfig(env.GetString("NATS_URL", "nats://localhost:4222")),
 	)
 	return defaultCfg
-}
-
-type Version string
-
-type Application struct {
-	Version     Version
-	Logger      zerolog.Logger
-	Service     service.Service
-	Store       store.Store
-	RedisClient *redis.Client
-	NatsClient  *nats.Conn
-}
-
-func NewApplication(service service.Service, store store.Store) Application {
-	app := Application{
-		Version: Version("0.0.1"),
-	}
-
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-
-	output := zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		TimeFormat: time.RFC3339,
-	}
-	app.Logger = zerolog.New(output).With().Timestamp().Logger()
-
-	return app
 }
